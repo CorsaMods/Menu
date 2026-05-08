@@ -326,10 +326,17 @@ local function buildPluginRows()
 						loadedModule.init()
 					end
 				end,
-				-- onDisable
+				-- onDisable: destroy, then wipe stale runtime refs so re-enable is clean
 				function()
 					if loadedModule and loadedModule.destroy then
 						loadedModule.destroy()
+					end
+					-- clear stale refs from the global cache so next init() starts fresh
+					if _G.ModMenuPlugins and _G.ModMenuPlugins[plugin.name] then
+						local m = _G.ModMenuPlugins[plugin.name]
+						m._gui           = nil
+						m._state         = nil
+						m._cornerThreads = nil
 					end
 					loadedModule = nil
 				end
@@ -437,6 +444,10 @@ loadBtn.MouseButton1Click:Connect(function()
 			end,
 			function()
 				if loadedModule.destroy then loadedModule.destroy() end
+				-- wipe stale refs so re-enable is clean
+				loadedModule._gui           = nil
+				loadedModule._state         = nil
+				loadedModule._cornerThreads = nil
 			end
 		)
 
