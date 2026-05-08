@@ -1,5 +1,5 @@
 local plugin = {
-	name    = "Texture Studio",
+	name    = "Texture Studio v2",
 	version = "3.0",
 	author  = "Kyoshin"
 }
