@@ -1,11 +1,11 @@
 {
     "version": "1.004",
     "builtin": [
-        { "name": "Air Suspension", "file": "air_suspension.lua", "category": "vehicle" },
-        { "name": "FPS Booster",    "file": "fps_booster.lua",    "category": "performance" },
-        { "name": "LOD Tweaker",    "file": "lod_tweaker.lua",    "category": "performance" },
+        { "name": "Air Suspension",  "file": "air_suspension.lua", "category": "vehicle" },
+        { "name": "FPS Booster",     "file": "fps_booster.lua",    "category": "performance" },
+        { "name": "LOD Tweaker",     "file": "lod_tweaker.lua",    "category": "performance" },
         { "name": "Custom Textures", "file": "custom_texture.lua", "category": "vehicle" },
-        { "name": "Engine Sound", "file": "sound_modify.lua", "category": "vehicle" },
-        {"name": "Ratio Finder", "file": "ratio_finder.lua", "category": "vehicle" }
+        { "name": "Engine Sound",    "file": "sound_modify.lua",   "category": "vehicle" },
+        { "name": "Ratio Finder",    "file": "ratio_finder.lua",   "category": "vehicle" }
     ]
 }
