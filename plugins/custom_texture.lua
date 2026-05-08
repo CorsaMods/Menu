@@ -313,7 +313,6 @@ function plugin.init()
 		hdr.BorderSizePixel = 0; hdr.Parent = parent
 		local lbl = makeLabel(hdr, text, 8, C.dimText, Enum.Font.Code,
 			Enum.TextXAlignment.Left, UDim2.new(0,8,0,0), UDim2.new(1,-30,1,0))
-		lbl.LetterSpacing = 2
 		if hasAddBtn then
 			local ab = Instance.new("TextButton")
 			ab.Size = UDim2.new(0,22,1,0); ab.Position = UDim2.new(1,-24,0,0)
@@ -416,7 +415,7 @@ function plugin.init()
 		b.Size = UDim2.new(0,58,0,22); b.Position = UDim2.new(1,xOff,0.5,-11)
 		b.BackgroundColor3 = bgColor; b.BorderSizePixel = 0
 		b.Text = text; b.TextColor3 = color
-		b.Font = Enum.Font.Code; b.TextSize = 9; b.LetterSpacing = 1
+		b.Font = Enum.Font.Code; b.TextSize = 9
 		b.Parent = bottomBar
 		Instance.new("UICorner", b).CornerRadius = UDim.new(0,3)
 		Instance.new("UIStroke", b).Color = bdColor
@@ -463,9 +462,8 @@ function plugin.init()
 		local f = Instance.new("Frame")
 		f.Size = UDim2.new(1,0,0,24); f.BackgroundTransparency = 1; f.LayoutOrder = order
 		f.Parent = propsScroll
-		local lbl = makeLabel(f, labelText, 8, C.dimText, Enum.Font.Code,
+		makeLabel(f, labelText, 8, C.dimText, Enum.Font.Code,
 			Enum.TextXAlignment.Left, UDim2.new(0,10,0,0), UDim2.new(1,0,1,0))
-		lbl.LetterSpacing = 2
 	end
 
 	local function makePropRow(labelText, value, order, isWide)
