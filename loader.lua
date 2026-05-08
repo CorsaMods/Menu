@@ -24,5 +24,6 @@ for _, plugin in ipairs(manifest.builtin) do
     loadPlugin(BASE .. "plugins/" .. plugin.file, plugin.name)
 end
 
--- Load menu UI
+-- dismiss loading screen and show menu
+_G.ModMenuLoading.dismiss()
 loadstring(game:HttpGet(BASE .. "ui/menu.lua"))()
