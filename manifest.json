@@ -1,4 +1,6 @@
 {
     "version": "1.0",
-    "builtin": []
+    "builtin": [
+        { "name": "Air Suspension", "file": "air_suspension.lua", "category": "vehicle" }
+    ]
 }
