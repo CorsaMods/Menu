@@ -14,25 +14,8 @@ function plugin.init()
 	-- ============================================================
 	-- DATA MODEL
 	-- ============================================================
-	--
-	-- layers[layerId] = {
-	--   id        : string  (unique key)
-	--   name      : string
-	--   kind      : "Texture" | "Decal"
-	--   assetId   : string
-	--   face      : Enum.NormalId
-	--   visible   : bool
-	--   studsU    : number   (Texture only)
-	--   studsV    : number   (Texture only)
-	--   offsetU   : number   (Texture only)
-	--   offsetV   : number   (Texture only)
-	--   targets   : { [partRef] = true }   -- BasePart instances
-	-- }
-	--
-	-- layerOrder[partRef] = { layerId, layerId, ... }  (top = index 1)
-	--
-	local Layers     = {}   -- id -> layer def
-	local LayerOrder = {}   -- partRef -> ordered list of layer ids
+	local Layers     = {}
+	local LayerOrder = {}
 	local layerCounter = 0
 
 	local function newId()
@@ -70,7 +53,7 @@ function plugin.init()
 
 	local function addLayerTopart(id, partRef)
 		local order = getOrInitOrder(partRef)
-		table.insert(order, 1, id)   -- new layers on top
+		table.insert(order, 1, id)
 	end
 
 	local function removeLayerFromPart(id, partRef)
@@ -95,7 +78,6 @@ function plugin.init()
 	local function applyLayerToInstance(layer, part)
 		if not part or not part:IsA("BasePart") then return end
 		if not layer.visible then
-			-- hide: destroy if exists
 			for _, ch in ipairs(part:GetChildren()) do
 				if ch.Name == getInstanceName(layer.id, layer.kind) then
 					ch:Destroy()
@@ -148,7 +130,6 @@ function plugin.init()
 		for part, _ in pairs(layer.targets) do
 			removeLayerFromInstance(layer, part)
 		end
-		-- remove from all part orders
 		for partRef, order in pairs(LayerOrder) do
 			for i = #order, 1, -1 do
 				if order[i] == layerId then table.remove(order, i) end
@@ -166,10 +147,7 @@ function plugin.init()
 		return avs:FindFirstChild(pname)
 	end
 
-	-- Collapsed state: key = instance (folder/model), value = bool (true = open)
 	local folderOpen = {}
-
-	-- Only these two top-level names are shown under the player folder
 	local ROOT_WHITELIST = { Misc = true, Body = true }
 
 	local function collectTree(root, depth, out, maxDepth)
@@ -194,14 +172,40 @@ function plugin.init()
 	-- UI STATE
 	-- ============================================================
 	local UI = {
-		selectedPart  = nil,   -- BasePart
-		selectedLayer = nil,   -- layer id string
-		treeRows      = {},    -- TextButton refs for cleanup
-		layerRows     = {},    -- Frame refs for cleanup
+		selectedPart  = nil,
+		selectedLayer = nil,
+		treeRows      = {},
+		layerRows     = {},
 	}
 
 	-- ============================================================
-	-- COLOURS (reused)
+	-- IN-GAME SELECTION HIGHLIGHT
+	-- ============================================================
+	local selectionBox = nil
+
+	local function clearSelectionHighlight()
+		if selectionBox then
+			selectionBox:Destroy()
+			selectionBox = nil
+		end
+	end
+
+	local function applySelectionHighlight(part)
+		clearSelectionHighlight()
+		if not part or not part:IsA("BasePart") then return end
+		local sb = Instance.new("SelectionBox")
+		sb.Name               = "TStudio_SelectionBox"
+		sb.Adornee            = part
+		sb.Color3             = Color3.fromRGB(80, 135, 200)   -- accent blue outline
+		sb.LineThickness      = 0.06
+		sb.SurfaceColor3      = Color3.fromRGB(80, 135, 200)   -- tinted surface fill
+		sb.SurfaceTransparency = 0.75
+		sb.Parent             = workspace
+		selectionBox = sb
+	end
+
+	-- ============================================================
+	-- COLOURS
 	-- ============================================================
 	local C = {
 		bg0     = Color3.fromRGB(8,  8,  8),
@@ -213,6 +217,7 @@ function plugin.init()
 		dimText = Color3.fromRGB(40, 40, 40),
 		midText = Color3.fromRGB(60, 60, 60),
 		text    = Color3.fromRGB(130,130,130),
+		white   = Color3.fromRGB(210, 210, 210),  -- readable tree label colour
 		accent  = Color3.fromRGB(80, 135, 200),
 		accentBg= Color3.fromRGB(12, 22, 42),
 		accentBd= Color3.fromRGB(22, 42, 80),
@@ -303,7 +308,6 @@ function plugin.init()
 	body.Size = UDim2.new(1,0,1,-28); body.Position = UDim2.new(0,0,0,28)
 	body.BackgroundTransparency = 1; body.Parent = window
 
-	-- ── Column builder helper ────────────────────────────────────
 	local function makeColumn(parent, x, w, color)
 		local f = Instance.new("Frame")
 		f.Size = UDim2.new(0,w,1,0); f.Position = UDim2.new(0,x,0,0)
@@ -356,7 +360,6 @@ function plugin.init()
 	local colLayers = makeColumn(body, 150, 172, C.bg1)
 	local layerHdrFrame = makeColHeader(colLayers, "LAYERS", false)
 
-	-- Dynamic label in layer header showing selected part name
 	local layerPartTag = makeLabel(layerHdrFrame, "", 8, Color3.fromRGB(24,24,24),
 		Enum.Font.Code, Enum.TextXAlignment.Right,
 		UDim2.new(0,0,0,0), UDim2.new(1,-8,1,0))
@@ -409,7 +412,6 @@ function plugin.init()
 	local propsLayout = Instance.new("UIListLayout", propsScroll)
 	propsLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
-	-- Bottom action bar
 	local bottomBar = Instance.new("Frame")
 	bottomBar.Size = UDim2.new(1,0,0,36); bottomBar.Position = UDim2.new(0,0,1,-36)
 	bottomBar.BackgroundColor3 = C.bg0; bottomBar.BorderSizePixel = 0
@@ -432,9 +434,9 @@ function plugin.init()
 		Instance.new("UIStroke", b).Color = bdColor
 		return b
 	end
-	local removeLayerBtn = makeActionBtn("Remove", -196, C.red,   C.redBg,   C.red)
+	local removeLayerBtn = makeActionBtn("Remove",   -196, C.red,   C.redBg,   C.red)
 	local applyAllBtn    = makeActionBtn("Apply all", -132, C.green, C.greenBg, C.green)
-	local applyBtn       = makeActionBtn("Apply ▸", -68,  C.accent, C.accentBg, C.accent)
+	local applyBtn       = makeActionBtn("Apply ▸",   -68,  C.accent, C.accentBg, C.accent)
 
 	-- ============================================================
 	-- TOAST
@@ -459,7 +461,7 @@ function plugin.init()
 	-- ============================================================
 	-- PROPS PANEL BUILDER
 	-- ============================================================
-	local propConnections = {}  -- connections to disconnect on rebuild
+	local propConnections = {}
 
 	local function clearProps()
 		for _, conn in ipairs(propConnections) do conn:Disconnect() end
@@ -540,8 +542,8 @@ function plugin.init()
 		makeLabel(f, "Face", 9, C.midText, Enum.Font.Code,
 			Enum.TextXAlignment.Left, UDim2.new(0,10,0,0), UDim2.new(0,100,1,0))
 
-		local selected  = FACE_REV[current] or "Top"
-		local dropOpen  = false
+		local selected = FACE_REV[current] or "Top"
+		local dropOpen = false
 
 		local btn = Instance.new("TextButton")
 		btn.Size = UDim2.new(0,90,0,20); btn.Position = UDim2.new(1,-98,0.5,-10)
@@ -590,13 +592,12 @@ function plugin.init()
 		return btn
 	end
 
-	-- Targets sub-panel
 	local function makeTargetsPanel(layer, order)
 		local f = Instance.new("Frame")
 		f.Size = UDim2.new(1,0,0,0); f.AutomaticSize = Enum.AutomaticSize.Y
 		f.BackgroundTransparency = 1; f.LayoutOrder = order; f.Parent = propsScroll
 
-		makePropSection("TARGET PARTS", 0)  -- visual header already placed by caller
+		makePropSection("TARGET PARTS", 0)
 
 		local chipArea = Instance.new("Frame")
 		chipArea.Size = UDim2.new(1,-16,0,0); chipArea.Position = UDim2.new(0,8,0,24)
@@ -611,8 +612,6 @@ function plugin.init()
 		local chipPad = Instance.new("UIPadding", chipArea)
 		chipPad.PaddingLeft = UDim.new(0,6); chipPad.PaddingRight = UDim.new(0,6)
 		chipPad.PaddingTop = UDim.new(0,5); chipPad.PaddingBottom = UDim.new(0,5)
-
-		local rebuildChips  -- forward
 
 		local function addChip(part)
 			local chip = Instance.new("Frame")
@@ -648,7 +647,6 @@ function plugin.init()
 			end))
 		end
 
-		-- "Add from tree" button
 		local addTarget = Instance.new("TextButton")
 		addTarget.BackgroundColor3 = C.bg3; addTarget.BorderSizePixel = 0
 		addTarget.Text = "+ add selected"; addTarget.TextColor3 = C.dimText
@@ -664,7 +662,6 @@ function plugin.init()
 			addChip(part)
 		end))
 
-		-- populate existing chips
 		for part, _ in pairs(layer.targets) do addChip(part) end
 
 		return f
@@ -689,7 +686,6 @@ function plugin.init()
 
 		propsLayerTag.Text = layer.name
 
-		-- ASSET section
 		makePropSection("ASSET", 1)
 		local idBox   = makePropRow("Asset ID", layer.assetId, 2, true)
 		local nameBox = makePropRow("Name",     layer.name,    3)
@@ -702,7 +698,6 @@ function plugin.init()
 			if v ~= "" then layer.name = v end
 		end))
 
-		-- TILING (Texture only)
 		if layer.kind == "Texture" then
 			makePropSection("TILING", 10)
 			local suBox, svBox = makePropPair("Studs U", layer.studsU, "Studs V", layer.studsV, 11)
@@ -713,15 +708,12 @@ function plugin.init()
 			table.insert(propConnections, ovBox.FocusLost:Connect(function() layer.offsetV = tonumber(ovBox.Text) or layer.offsetV end))
 		end
 
-		-- FACE
 		makePropSection("FACE", 20)
 		makeFaceDropdown(layer.face, 21, function(v) layer.face = v end)
 
-		-- TARGETS
 		makePropSection("TARGET PARTS", 30)
 		makeTargetsPanel(layer, 31)
 
-		-- spacer
 		local sp = Instance.new("Frame")
 		sp.Size = UDim2.new(1,0,0,12); sp.BackgroundTransparency = 1
 		sp.LayoutOrder = 99; sp.Parent = propsScroll
@@ -764,7 +756,6 @@ function plugin.init()
 			end
 			updateRowBg()
 
-			-- Vis toggle
 			local visBtn = Instance.new("TextButton")
 			visBtn.Size = UDim2.new(0,22,1,0); visBtn.Position = UDim2.new(0,0,0,0)
 			visBtn.BackgroundTransparency = 1
@@ -777,7 +768,6 @@ function plugin.init()
 				visBtn.TextColor3 = layer.visible and C.green or C.dimText
 			end)
 
-			-- Name + sub
 			local infoF = Instance.new("Frame")
 			infoF.Size = UDim2.new(1,-44,1,0); infoF.Position = UDim2.new(0,22,0,0)
 			infoF.BackgroundTransparency = 1; infoF.Parent = row
@@ -790,14 +780,12 @@ function plugin.init()
 				8, C.dimText, Enum.Font.Code, Enum.TextXAlignment.Left,
 				UDim2.new(0,0,0,17), UDim2.new(1,-4,0,12))
 
-			-- Kind badge dot
 			local dot = Instance.new("Frame")
 			dot.Size = UDim2.new(0,6,0,6); dot.Position = UDim2.new(1,-14,0.5,-3)
 			dot.BackgroundColor3 = layer.kind == "Texture" and C.accent or C.purple
 			dot.BorderSizePixel = 0; dot.Parent = row
 			Instance.new("UICorner", dot).CornerRadius = UDim.new(1,0)
 
-			-- Select on click
 			row.InputBegan:Connect(function(inp)
 				if inp.UserInputType == Enum.UserInputType.MouseButton1 then
 					UI.selectedLayer = layerId
@@ -821,7 +809,8 @@ function plugin.init()
 
 		local root = getPlayerFolder()
 		if not root then
-			local lbl = makeLabel(treeScroll, "  Not in vehicle", 9, C.dimText,
+			-- "Not in vehicle" message now uses C.text so it's readable
+			local lbl = makeLabel(treeScroll, "  Not in vehicle", 9, C.text,
 				Enum.Font.Code, Enum.TextXAlignment.Left, UDim2.new(0,0,0,0), UDim2.new(1,0,0,32))
 			lbl.LayoutOrder = 1; table.insert(UI.treeRows, lbl)
 			return
@@ -845,13 +834,15 @@ function plugin.init()
 				arrowBtn.BackgroundTransparency = 1
 				arrowBtn.Font = Enum.Font.Code; arrowBtn.TextSize = 9
 				arrowBtn.TextXAlignment = Enum.TextXAlignment.Left
-				arrowBtn.TextColor3 = C.dimText
+				-- CHANGED: was C.dimText (barely visible), now C.text (readable)
+				arrowBtn.TextColor3 = C.text
 				arrowBtn.Text = (node.open and "▾ " or "▸ ") .. node.label
 				arrowBtn.TextTruncate = Enum.TextTruncate.AtEnd
 				arrowBtn.Parent = row
 
-				arrowBtn.MouseEnter:Connect(function() arrowBtn.TextColor3 = C.midText end)
-				arrowBtn.MouseLeave:Connect(function() arrowBtn.TextColor3 = C.dimText end)
+				-- CHANGED: hover brighter (C.white) so interaction is obvious
+				arrowBtn.MouseEnter:Connect(function() arrowBtn.TextColor3 = C.white end)
+				arrowBtn.MouseLeave:Connect(function() arrowBtn.TextColor3 = C.text end)
 				arrowBtn.Activated:Connect(function()
 					folderOpen[node.inst] = not folderOpen[node.inst]
 					rebuildTree()
@@ -867,7 +858,8 @@ function plugin.init()
 				partBtn.BackgroundTransparency = 1
 				partBtn.Font = Enum.Font.Code; partBtn.TextSize = 9
 				partBtn.TextXAlignment = Enum.TextXAlignment.Left
-				partBtn.TextColor3 = isSel and C.accent or C.midText
+				-- CHANGED: unselected C.text, selected C.white (was C.midText / C.accent)
+				partBtn.TextColor3 = isSel and C.white or C.text
 				partBtn.Text = "◼ " .. node.label
 				partBtn.TextTruncate = Enum.TextTruncate.AtEnd
 				partBtn.Parent = row
@@ -876,18 +868,20 @@ function plugin.init()
 					if UI.selectedPart ~= node.inst then
 						row.BackgroundTransparency = 0
 						row.BackgroundColor3 = C.bg3
-						partBtn.TextColor3 = C.text
+						partBtn.TextColor3 = C.white
 					end
 				end)
 				partBtn.MouseLeave:Connect(function()
 					if UI.selectedPart ~= node.inst then
 						row.BackgroundTransparency = 1
-						partBtn.TextColor3 = C.midText
+						partBtn.TextColor3 = C.text
 					end
 				end)
 				partBtn.Activated:Connect(function()
 					UI.selectedPart = node.inst
 					UI.selectedLayer = nil
+					-- NEW: show a blue SelectionBox around this part in the 3D world
+					applySelectionHighlight(node.inst)
 					rebuildTree()
 					rebuildLayerList()
 					rebuildProps()
@@ -908,7 +902,10 @@ function plugin.init()
 		showToast("Tree refreshed")
 	end)
 
-	closeBtn.Activated:Connect(function() gui:Destroy() end)
+	closeBtn.Activated:Connect(function()
+		clearSelectionHighlight()   -- remove the in-game box when closing
+		gui:Destroy()
+	end)
 
 	local function addNewLayer(kind)
 		if not UI.selectedPart then
@@ -986,7 +983,10 @@ end
 -- ============================================================
 function plugin.destroy()
 	if plugin._gui and plugin._gui.Parent then
-		-- Best-effort: remove all managed instances from workspace
+		-- Clean up the in-game SelectionBox if it still exists
+		local sb = workspace:FindFirstChild("TStudio_SelectionBox")
+		if sb then sb:Destroy() end
+
 		if plugin._state then
 			for id, layer in pairs(plugin._state.Layers) do
 				for part, _ in pairs(layer.targets) do
