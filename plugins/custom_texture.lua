@@ -1,5 +1,5 @@
 local plugin = {
-	name = "Apply Texture",
+	name = "Custom Textures",
 	version = "1.0",
 	author = "Kyoshin"
 }
