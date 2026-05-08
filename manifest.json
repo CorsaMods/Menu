@@ -6,5 +6,6 @@
         { "name": "LOD Tweaker",    "file": "lod_tweaker.lua",    "category": "performance" },
         { "name": "Custom Textures", "file": "custom_texture.lua", "category": "vehicle" },
         { "name": "Engine Sound", "file": "sound_modify.lua", "category": "vehicle" }
+        {"name": "Ratio Grabber", "file": "ratiograbber.lua", "category": "vehicle" }
     ]
 }
