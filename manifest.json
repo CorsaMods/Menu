@@ -1,7 +1,8 @@
 {
-    "version": "1.003",
+    "version": "1.004",
     "builtin": [
         { "name": "Air Suspension", "file": "air_suspension.lua", "category": "vehicle" },
-        { "name": "FPS Booster", "file": "fps_booster.lua", "category": "performance" }
+        { "name": "FPS Booster",    "file": "fps_booster.lua",    "category": "performance" },
+        { "name": "LOD Tweaker",    "file": "lod_tweaker.lua",    "category": "performance" }
     ]
 }
