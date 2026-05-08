@@ -1,12 +1,14 @@
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 if PlayerGui:FindFirstChild("ModMenu") then
     PlayerGui.ModMenu:Destroy()
 end
+
+local BASE = "https://raw.githubusercontent.com/CorsaMods/Menu/main/"
 
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "ModMenu"
@@ -33,7 +35,7 @@ mainStroke.Transparency = 0.92
 mainStroke.Thickness = 1
 mainStroke.Parent = Main
 
--- header gradient bg
+-- header
 local Header = Instance.new("Frame")
 Header.Size = UDim2.new(1, 0, 0, 54)
 Header.BackgroundColor3 = Color3.fromRGB(160, 20, 20)
@@ -48,7 +50,6 @@ headerGrad.Color = ColorSequence.new({
 headerGrad.Rotation = 90
 headerGrad.Parent = Header
 
--- red line under header
 local HeaderLine = Instance.new("Frame")
 HeaderLine.Size = UDim2.new(1, 0, 0, 2)
 HeaderLine.Position = UDim2.new(0, 0, 1, -2)
@@ -77,7 +78,7 @@ SubLabel.TextSize = 9
 SubLabel.Font = Enum.Font.GothamBold
 SubLabel.Parent = Header
 
--- scrolling content
+-- scroll
 local ScrollFrame = Instance.new("ScrollingFrame")
 ScrollFrame.Size = UDim2.new(1, 0, 1, -82)
 ScrollFrame.Position = UDim2.new(0, 0, 0, 54)
@@ -93,7 +94,7 @@ local listLayout = Instance.new("UIListLayout")
 listLayout.Padding = UDim.new(0, 0)
 listLayout.Parent = ScrollFrame
 
--- section header
+-- section label
 local function addSection(text)
     local section = Instance.new("Frame")
     section.Size = UDim2.new(1, 0, 0, 22)
@@ -118,12 +119,10 @@ local function addSection(text)
     label.Font = Enum.Font.GothamBold
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = section
-
-    return section
 end
 
--- toggle row
-local function addToggleRow(name, subtext, enabled)
+-- plugin row with real toggle logic
+local function addPluginRow(name, subtext, onEnable, onDisable)
     local row = Instance.new("Frame")
     row.Size = UDim2.new(1, 0, 0, 38)
     row.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -164,13 +163,13 @@ local function addToggleRow(name, subtext, enabled)
         sub.Parent = row
     end
 
-    local isOn = enabled or false
+    local isOn = false
 
     local toggleBtn = Instance.new("TextButton")
     toggleBtn.Size = UDim2.new(0, 32, 0, 16)
     toggleBtn.Position = UDim2.new(1, -44, 0.5, -8)
     toggleBtn.Text = ""
-    toggleBtn.BackgroundColor3 = isOn and Color3.fromRGB(180, 25, 25) or Color3.fromRGB(50, 50, 50)
+    toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
     toggleBtn.BorderSizePixel = 0
     toggleBtn.Parent = row
 
@@ -180,7 +179,7 @@ local function addToggleRow(name, subtext, enabled)
 
     local dot = Instance.new("Frame")
     dot.Size = UDim2.new(0, 12, 0, 12)
-    dot.Position = isOn and UDim2.new(1, -14, 0.5, -6) or UDim2.new(0, 2, 0.5, -6)
+    dot.Position = UDim2.new(0, 2, 0.5, -6)
     dot.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     dot.BorderSizePixel = 0
     dot.Parent = toggleBtn
@@ -198,12 +197,31 @@ local function addToggleRow(name, subtext, enabled)
             and UDim2.new(1, -14, 0.5, -6)
             or UDim2.new(0, 2, 0.5, -6)
         row.BackgroundTransparency = isOn and 0.94 or 0.97
-    end)
 
-    return row
+        if isOn then
+            if onEnable then
+                local ok, err = pcall(onEnable)
+                if not ok then
+                    warn("[ModMenu] Failed to enable " .. name .. ": " .. tostring(err))
+                    -- revert toggle if it errored
+                    isOn = false
+                    toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+                    dot.Position = UDim2.new(0, 2, 0.5, -6)
+                    row.BackgroundTransparency = 0.97
+                end
+            end
+        else
+            if onDisable then
+                local ok, err = pcall(onDisable)
+                if not ok then
+                    warn("[ModMenu] Failed to disable " .. name .. ": " .. tostring(err))
+                end
+            end
+        end
+    end)
 end
 
--- arrow row (for sub menus / custom plugins)
+-- arrow row for custom plugin panel
 local function addArrowRow(name, subtext, callback)
     local row = Instance.new("TextButton")
     row.Size = UDim2.new(1, 0, 0, 38)
@@ -260,26 +278,68 @@ local function addArrowRow(name, subtext, callback)
     row.MouseButton1Click:Connect(function()
         if callback then callback() end
     end)
-
-    return row
 end
 
--- build the menu items
-addSection("VEHICLE")
-addToggleRow("Air Suspension", "built-in", false)
-addToggleRow("Custom Liveries", "built-in", false)
-addToggleRow("Speedometer HUD", "built-in", false)
+-- load manifest and build plugin rows dynamically
+local function buildPluginRows()
+    local ok, raw = pcall(function()
+        return game:HttpGet(BASE .. "manifest.json")
+    end)
+    if not ok then
+        warn("[ModMenu] Failed to fetch manifest")
+        return
+    end
 
-addSection("VISUAL")
-addToggleRow("Neon Underglow", "built-in", false)
+    local manifest = HttpService:JSONDecode(raw)
+    if not manifest or not manifest.builtin then return end
 
+    -- group by category
+    local categories = {}
+    local categoryOrder = {}
+    for _, plugin in ipairs(manifest.builtin) do
+        local cat = (plugin.category or "other"):upper()
+        if not categories[cat] then
+            categories[cat] = {}
+            table.insert(categoryOrder, cat)
+        end
+        table.insert(categories[cat], plugin)
+    end
+
+    -- build rows per category
+    for _, cat in ipairs(categoryOrder) do
+        addSection(cat)
+        for _, plugin in ipairs(categories[cat]) do
+            local loadedModule = nil
+
+            addPluginRow(
+                plugin.name,
+                "built-in",
+                -- onEnable
+                function()
+                    local raw = game:HttpGet(BASE .. "plugins/" .. plugin.file)
+                    loadedModule = loadstring(raw)()
+                    if loadedModule and loadedModule.init then
+                        loadedModule.init()
+                    end
+                end,
+                -- onDisable
+                function()
+                    if loadedModule and loadedModule.destroy then
+                        loadedModule.destroy()
+                    end
+                    loadedModule = nil
+                end
+            )
+        end
+    end
+end
+
+buildPluginRows()
+
+-- custom plugin section
 addSection("PLUGINS")
-addArrowRow("Load Custom Plugin", "paste a github url", function()
-    -- open custom plugin panel
-    CustomPanel.Visible = not CustomPanel.Visible
-end)
 
--- custom plugin panel
+-- custom panel
 local CustomPanel = Instance.new("Frame")
 CustomPanel.Size = UDim2.new(1, 0, 0, 80)
 CustomPanel.BackgroundColor3 = Color3.fromRGB(20, 5, 5)
@@ -334,7 +394,6 @@ local loadCorner = Instance.new("UICorner")
 loadCorner.CornerRadius = UDim.new(0, 4)
 loadCorner.Parent = loadBtn
 
--- status label (outside panel, in scroll)
 local statusLabel = Instance.new("TextLabel")
 statusLabel.Size = UDim2.new(1, 0, 0, 20)
 statusLabel.BackgroundTransparency = 1
@@ -344,6 +403,10 @@ statusLabel.TextSize = 10
 statusLabel.Font = Enum.Font.Gotham
 statusLabel.TextXAlignment = Enum.TextXAlignment.Center
 statusLabel.Parent = ScrollFrame
+
+addArrowRow("Load Custom Plugin", "paste a github url", function()
+    CustomPanel.Visible = not CustomPanel.Visible
+end)
 
 loadBtn.MouseButton1Click:Connect(function()
     local url = urlBox.Text
@@ -355,12 +418,24 @@ loadBtn.MouseButton1Click:Connect(function()
         return loadstring(game:HttpGet(url))()
     end)
 
-    if ok and type(result) == "table" and result.init then
-        result.init()
+    if ok and type(result) == "table" then
         local pName = result.name or "Unknown"
+        local pAuthor = result.author or "unknown"
         statusLabel.Text = "loaded: " .. pName
         statusLabel.TextColor3 = Color3.fromRGB(200, 40, 40)
-        addToggleRow(pName, "@" .. (result.author or "unknown"), true)
+
+        local loadedModule = result
+        addPluginRow(
+            pName,
+            "@" .. pAuthor,
+            function()
+                if loadedModule.init then loadedModule.init() end
+            end,
+            function()
+                if loadedModule.destroy then loadedModule.destroy() end
+            end
+        )
+
         urlBox.Text = ""
         CustomPanel.Visible = false
     else
@@ -410,17 +485,13 @@ VersionLabel.Font = Enum.Font.GothamBold
 VersionLabel.TextXAlignment = Enum.TextXAlignment.Right
 VersionLabel.Parent = Footer
 
--- toggle visibility
+-- toggle menu
 local menuOpen = false
-
-local function setMenuVisible(visible)
-    menuOpen = visible
-    Main.Visible = visible
-end
 
 UserInputService.InputBegan:Connect(function(input, gpe)
     if gpe then return end
     if input.KeyCode == Enum.KeyCode.RightShift then
-        setMenuVisible(not menuOpen)
+        menuOpen = not menuOpen
+        Main.Visible = menuOpen
     end
 end)
