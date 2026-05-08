@@ -1,5 +1,5 @@
 local plugin = {
-	name    = "Texture Studio v2",
+	name    = "Texture Studio v3",
 	version = "3.0",
 	author  = "Kyoshin"
 }
@@ -166,15 +166,26 @@ function plugin.init()
 		return avs:FindFirstChild(pname)
 	end
 
+	-- Collapsed state: key = instance (folder/model), value = bool (true = open)
+	local folderOpen = {}
+
+	-- Only these two top-level names are shown under the player folder
+	local ROOT_WHITELIST = { Misc = true, Body = true }
+
 	local function collectTree(root, depth, out, maxDepth)
-		maxDepth = maxDepth or 7
+		maxDepth = maxDepth or 8
 		if depth > maxDepth then return end
 		for _, child in ipairs(root:GetChildren()) do
+			if depth == 0 and not ROOT_WHITELIST[child.Name] then continue end
+
 			if child:IsA("BasePart") then
 				table.insert(out, { inst = child, depth = depth, isFolder = false, label = child.Name })
 			elseif child:IsA("Model") or child:IsA("Folder") then
-				table.insert(out, { inst = child, depth = depth, isFolder = true,  label = child.Name })
-				collectTree(child, depth + 1, out, maxDepth)
+				if folderOpen[child] == nil then folderOpen[child] = false end
+				table.insert(out, { inst = child, depth = depth, isFolder = true, label = child.Name, open = folderOpen[child] })
+				if folderOpen[child] then
+					collectTree(child, depth + 1, out, maxDepth)
+				end
 			end
 		end
 	end
@@ -820,36 +831,61 @@ function plugin.init()
 		collectTree(root, 0, nodes)
 
 		for i, node in ipairs(nodes) do
-			local btn = Instance.new("TextButton")
-			btn.Size = UDim2.new(1,0,0,22); btn.BorderSizePixel = 0
-			btn.BackgroundTransparency = 1
-			btn.Font = Enum.Font.Code; btn.TextSize = 9
-			btn.TextXAlignment = Enum.TextXAlignment.Left
-			btn.LayoutOrder = i; btn.Parent = treeScroll
+			local row = Instance.new("Frame")
+			row.Size = UDim2.new(1,0,0,22); row.BorderSizePixel = 0
+			row.BackgroundTransparency = 1; row.LayoutOrder = i
+			row.Parent = treeScroll
 
-			local indent = node.depth * 10 + 8
-			local icon   = node.isFolder and "▸ " or "◼ "
-			btn.Text = string.rep(" ", node.depth * 2) .. icon .. node.label
+			local indentPx = node.depth * 10 + 4
 
-			local isSel = (not node.isFolder) and (UI.selectedPart == node.inst)
-			btn.BackgroundColor3 = C.accentBg
-			btn.BackgroundTransparency = isSel and 0 or 1
-			btn.TextColor3 = isSel and C.accent
-				or (node.isFolder and C.dimText or C.midText)
+			if node.isFolder then
+				local arrowBtn = Instance.new("TextButton")
+				arrowBtn.Size = UDim2.new(1, -indentPx, 1, 0)
+				arrowBtn.Position = UDim2.new(0, indentPx, 0, 0)
+				arrowBtn.BackgroundTransparency = 1
+				arrowBtn.Font = Enum.Font.Code; arrowBtn.TextSize = 9
+				arrowBtn.TextXAlignment = Enum.TextXAlignment.Left
+				arrowBtn.TextColor3 = C.dimText
+				arrowBtn.Text = (node.open and "▾ " or "▸ ") .. node.label
+				arrowBtn.TextTruncate = Enum.TextTruncate.AtEnd
+				arrowBtn.Parent = row
 
-			if not node.isFolder then
-				btn.MouseEnter:Connect(function()
+				arrowBtn.MouseEnter:Connect(function() arrowBtn.TextColor3 = C.midText end)
+				arrowBtn.MouseLeave:Connect(function() arrowBtn.TextColor3 = C.dimText end)
+				arrowBtn.Activated:Connect(function()
+					folderOpen[node.inst] = not folderOpen[node.inst]
+					rebuildTree()
+				end)
+			else
+				local isSel = (UI.selectedPart == node.inst)
+				row.BackgroundColor3 = isSel and C.accentBg or C.bg3
+				row.BackgroundTransparency = isSel and 0 or 1
+
+				local partBtn = Instance.new("TextButton")
+				partBtn.Size = UDim2.new(1, -indentPx, 1, 0)
+				partBtn.Position = UDim2.new(0, indentPx, 0, 0)
+				partBtn.BackgroundTransparency = 1
+				partBtn.Font = Enum.Font.Code; partBtn.TextSize = 9
+				partBtn.TextXAlignment = Enum.TextXAlignment.Left
+				partBtn.TextColor3 = isSel and C.accent or C.midText
+				partBtn.Text = "◼ " .. node.label
+				partBtn.TextTruncate = Enum.TextTruncate.AtEnd
+				partBtn.Parent = row
+
+				partBtn.MouseEnter:Connect(function()
 					if UI.selectedPart ~= node.inst then
-						btn.BackgroundTransparency = 0
-						btn.BackgroundColor3 = C.bg3
+						row.BackgroundTransparency = 0
+						row.BackgroundColor3 = C.bg3
+						partBtn.TextColor3 = C.text
 					end
 				end)
-				btn.MouseLeave:Connect(function()
+				partBtn.MouseLeave:Connect(function()
 					if UI.selectedPart ~= node.inst then
-						btn.BackgroundTransparency = 1
+						row.BackgroundTransparency = 1
+						partBtn.TextColor3 = C.midText
 					end
 				end)
-				btn.Activated:Connect(function()
+				partBtn.Activated:Connect(function()
 					UI.selectedPart = node.inst
 					UI.selectedLayer = nil
 					rebuildTree()
@@ -858,7 +894,7 @@ function plugin.init()
 				end)
 			end
 
-			table.insert(UI.treeRows, btn)
+			table.insert(UI.treeRows, row)
 		end
 
 		updateStats()
