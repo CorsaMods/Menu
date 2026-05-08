@@ -1,13 +1,10 @@
 local plugin = {
 	name = "Air Suspension",
 	version = "1.0",
-	author = "you"
+	author = "Kyoshin"
 }
 
 function plugin.init()
-	-- // BAGS SYSTEM v3
-	-- // Captures original ride height at runtime, slam + return to OEM
-
 	local RunService = game:GetService("RunService")
 	local plr = game.Players.LocalPlayer
 	local pname = plr.Name
@@ -92,7 +89,6 @@ function plugin.init()
 
 	-- ============================================================
 	-- CAPTURE DEFAULTS
-	-- Retries every 0.5s until the car exists and springs are valid
 	-- ============================================================
 	local function captureDefaults()
 		local springs = getAllSprings()
@@ -136,7 +132,6 @@ function plugin.init()
 
 	-- ============================================================
 	-- PSI -> SPRING LENGTH
-	-- Maps 0-120 PSI to lowered height -> captured OEM height
 	-- ============================================================
 	local function psiToLength(corner, psi)
 		local top = DEFAULT_LENGTHS[corner] or 2.5
@@ -146,7 +141,6 @@ function plugin.init()
 
 	-- ============================================================
 	-- PSI DRIVER LOOP
-	-- Runs every heartbeat, pushes spring lengths from PSI values
 	-- ============================================================
 	local function startPSILoop()
 		if State.connections.psiLoop then
@@ -168,7 +162,6 @@ function plugin.init()
 
 	-- ============================================================
 	-- PER-CORNER ANIMATION
-	-- Each corner owns a token; cancels itself if token changes
 	-- ============================================================
 	local function animateCorner(corner, targetPSI, duration, startDelay, weightBias, isDropping)
 		if cornerThreads[corner] then
@@ -360,7 +353,7 @@ function plugin.init()
 	-- ============================================================
 	-- PSI BAR UPDATE LOOP
 	-- ============================================================
-	RunService.Heartbeat:Connect(function()
+	local barLoop = RunService.Heartbeat:Connect(function()
 		for _, corner in ipairs(corners) do
 			local pct = math.clamp(State.psi[corner] / CFG.PSI_MAX, 0, 1)
 			local obj = barObjs[corner]
@@ -374,6 +367,9 @@ function plugin.init()
 			end
 		end
 	end)
+
+	-- store for cleanup
+	State.connections.barLoop = barLoop
 
 	-- ============================================================
 	-- BUTTON LOGIC
@@ -405,10 +401,47 @@ function plugin.init()
 	-- ============================================================
 	startPSILoop()
 	print("[ModMenu] Air Suspension loaded")
+
+	-- expose gui reference for destroy
+	plugin._gui = gui
+	plugin._state = State
+	plugin._cornerThreads = cornerThreads
 end
 
 function plugin.destroy()
-	-- cleanup on disable
+	-- cancel all corner animations
+	if plugin._cornerThreads then
+		for corner, _ in pairs(plugin._cornerThreads) do
+			plugin._cornerThreads[corner] = false
+		end
+	end
+
+	-- disconnect all RunService connections
+	if plugin._state and plugin._state.connections then
+		for key, conn in pairs(plugin._state.connections) do
+			if conn and typeof(conn) == "RBXScriptConnection" then
+				conn:Disconnect()
+			end
+			plugin._state.connections[key] = nil
+		end
+	end
+
+	-- restore springs to default before destroying
+	-- (so the car doesn't stay slammed after toggle off)
+	if plugin._state then
+		plugin._state.psi = { FL = 120, FR = 120, RL = 120, RR = 120 }
+	end
+
+	-- destroy the GUI
+	if plugin._gui and plugin._gui.Parent then
+		plugin._gui:Destroy()
+	end
+
+	plugin._gui = nil
+	plugin._state = nil
+	plugin._cornerThreads = nil
+
+	print("[ModMenu] Air Suspension unloaded")
 end
 
 return plugin
