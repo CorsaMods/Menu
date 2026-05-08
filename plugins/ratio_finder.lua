@@ -1,5 +1,5 @@
 local plugin = {
-	name = "Ratio Grabber",
+	name = "Ratio Finder",
 	version = "1.0",
 	author = "Kyoshin"
 }
