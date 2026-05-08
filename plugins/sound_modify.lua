@@ -14,7 +14,7 @@ function plugin.init()
 	-- CONFIG
 	-- ============================================================
 	local CFG = {
-		POLL_RATE   = 0.5,   -- how often to check if exhaust sound changed
+		POLL_RATE   = 0.01,   -- how often to check if exhaust sound changed
 		REMOTE_PATH = {      -- path to FireServer remote
 			"PlayerGui",
 			"A-Chassis Interface",
