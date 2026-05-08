@@ -8,7 +8,9 @@ end
 
 -- Loading screen
 local ui = fetch("ui/loading.lua")
+_G.ModMenuLoading = ui
 ui.show("Loading mod menu...")
+
 
 -- Load core
 local ok, err = pcall(fetch, "loader.lua")
