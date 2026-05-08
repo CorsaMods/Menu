@@ -30,7 +30,7 @@ function plugin.init()
 	-- HELPERS
 	-- ============================================================
 	local function getAVehicleWorkspace()
-		return workspace:FindFirstChild("AVehicleWorkspace")
+		return workspace:FindFirstChild("AVehicleStorage")
 	end
 
 	-- Collect direct children of AVehicleWorkspace
