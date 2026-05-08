@@ -15,7 +15,7 @@ function plugin.init()
 	-- CONFIG
 	-- ============================================================
 	local CFG = {
-		TEXTURE_ID    = "rbxassetid://92003953972027",
+		TEXTURE_ID    = "rbxassetid://121289954112924",
 		OFFSET_U      = 3,
 		OFFSET_V      = 3,
 		STUDS_U       = 6,
