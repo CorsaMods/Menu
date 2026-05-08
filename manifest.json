@@ -4,6 +4,6 @@
         { "name": "Air Suspension", "file": "air_suspension.lua", "category": "vehicle" },
         { "name": "Custom Textures", "file": "customtexture.lua", "category": "vehicle" },
         { "name": "FPS Booster",    "file": "fps_booster.lua",    "category": "performance" },
-        { "name": "LOD Tweaker",    "file": "lod_tweaker.lua",    "category": "performance" },
+        { "name": "LOD Tweaker",    "file": "lod_tweaker.lua",    "category": "performance" }
     ]
 }
